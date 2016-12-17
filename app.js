@@ -6,19 +6,23 @@ var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var jwt = require('jsonwebtoken');
 var cors = require('cors');
-
-var DOMAIN = 'api.golfguide.net';
+var database = require('./models/database');
+var DOMAIN = 'api.smithdev.io';
 
 var routes = require('./routes/index');
 var admin = require('./routes/admin');
 var login = require('./routes/login');
 var user = require('./routes/user');
+var blog = require('./routes/blog');
+var passwordReset = require('./routes/passwordReset');
+var secrets = require('./secrets');
 
 var app = express();
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
+app.jwtSecret = secrets.jwt;
 
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
@@ -31,7 +35,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors({
   methods: ['GET', 'PUT', 'POST', 'OPTIONS'],
   origin:	[
-	'http://smithdev.io'
+	'https://smithdev.io'
 		],
   credentials: true
 }));
@@ -57,6 +61,7 @@ var decodeToken = function(req, res, next){
             req.wellFormedToken = false;
             
         }
+		
         next();
     });
 }
@@ -65,6 +70,8 @@ var decodeToken = function(req, res, next){
     "authenticate" means the token nonce matches with our nonce
     This function won't throw errors, but will label you with labels
     that may cause errors in the future
+	
+	We are not checking nonces for now, running into issues -_-
 */
 var authenticateToken = function(req, res, next){
     if(req.wellFormedToken){
@@ -79,7 +86,11 @@ var authenticateToken = function(req, res, next){
                 console.log("user unauthenticated");
             }
             next();
-        }, function(err){ console.log("authentication err ", err); next();});
+        })
+		.catch(function(err){
+			console.log("authentication err ", err);
+			next();
+		});
     }else{
         next();
     }
@@ -98,13 +109,18 @@ var authorizeAdmin = function(req, res, next){
             req.admin = authorized;
             console.log("authorization status of user :", req.admin);
             if(req.admin){
+				console.log("User is admin");
                 next();
             }else{
                 res.status(401).send("User is not an administrator");
             }
-        }, function(err){ console.log("authorize err ", err); res.status(400).send("User is not an administrator");});
+        })
+		.catch(function(err){
+			console.log("authorize err ", err);
+			res.status(401).send("User failed to properly authenticate");
+		});
     }else{
-        res.status(401).send("User is not an administrator");
+        res.status(401).send("User's nonce is invalid");
     }
 }
 
@@ -116,8 +132,10 @@ var authorizeUser = function(req, res, next){
     console.log("attempting user authorization");
     if(req.authenticated){
         console.log("user authenticated!");
-        next();
+		console.log("User ID: ", req.tokenData.userid);
         req.query.userid = req.tokenData.userid;
+		
+        next();
     }else{
         console.log("user authorization failed");
         req.body.userid = -1;
@@ -133,11 +151,12 @@ app.use('/user', decodeToken);
 app.use('/user', authenticateToken);
 app.use('/user', authorizeUser);
 
-
 app.use('/', routes);
 app.use('/login', login);
 app.use('/admin', admin);
 app.use('/user', user);
+app.use('/blog', blog);
+app.use('/passwords', passwordReset);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
@@ -158,5 +177,6 @@ app.use(function(err, req, res, next) {
 });
 
 console.log("Server awake and listening on port 3000\n");
+
 
 module.exports = app;

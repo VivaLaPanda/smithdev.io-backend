@@ -7,50 +7,54 @@ database = require('../models/database');
 
 router.post('/newUser', function(req, res, next) {
     data = req.body.data;
-    log.it("attempting new user creation", req.body);
+    console.log("attempting new user creation", data);
     database.newUser(data).then(function(result){
-        log.it("new user result: ", result);
-        return result;
-    },function(err){
-        log.it("new user - there was an error : ", err);
-        res.status(500).send("an account with that name has already been created");
-    }).then(database.blankUserTable)
-    .then(function(result){
-        log.it("blanked result: ", result);
+        console.log("new user result: ", result);
         res.status(200).send("account created");
+    })
+	.catch(function(err){
+        console.log("new user - there was an error : ", err);
+        res.status(500).send("an account with that name has already been created");
     });
 });
 
 router.post('/login', function(req, res, next) {
     var data = req.body.data;
-    log.it("attempting login", req.body);
+    console.log("attempting login", req.body);
     database.verifyUser(data).then(function(result){
-        log.it("credentials verified! ", result);
+        console.log("credentials verified! ", result);
         if(result.success){
-            log.it("getting userData...");
+            console.log("getting userData...");
             database.getUserIDByEmail(data)
             .then(database.generateNonceForUser)
             .then(function(data){
-                log.it("got userid, hash..." , data);
-                database.checkNonceForUser(data).then(
-                    function(right){log.it("nonce check result :", right); },
-                    function(err){ log.it("nonce check err ", err); }
-                );
+                console.log("got userid, hash..." , data);
+                database.checkNonceForUser(data)
+				.then(function(right){
+						console.log("nonce check result :", right); 
+				})
+				.catch(function(err) {
+					console.log("nonce check err ", err);
+					
+					res.status(500).send({success : result.success, message:"Something went wrong, please wait and try again."});
+				});
+				
                 jwtSecret = req.app.jwtSecret;
-                log.it("encrypting ", data, " with secret ", jwtSecret);
+                console.log("encrypting ", data, " with secret ", jwtSecret);
                 token = jwt.sign(data , jwtSecret);
-                log.it("token is ", token);
-                res.cookie('token', token, { domain: 'api.golfguide.net', expires: new Date(Date.now() + 9000000), httpOnly: true, secure: true});
-                log.it("cookie set! returning ");
+                console.log("token is ", token);
+                res.cookie('token', token, { domain: 'api.smithdev.io', expires: new Date(Date.now() + 9000000), httpOnly: true, secure: true});
+                console.log("cookie set! returning ");
                 res.status(200).send({isadmin : data.isadmin, success : result.success});
             });
         }else{
-            log.it("credentials incorrect! ", result);
+            console.log("credentials incorrect! ", result);
             res.status(401).send({success : result.success, message:"Wrong email or password"});
         }
-    },function(err){
-        log.it("login - there was an error : ", err);
-        res.status(500).send({success : result.success, message:"Something went wrong, please wait and try again"});
+    })
+	.catch(function(err){
+        console.log("login - there was an error : ", err);
+        res.status(500).send({success : false, message:"Wrong email or password"});
     })
 });
 

@@ -3,23 +3,17 @@ var router = express.Router();
 database = require('../models/database');
 
 router.get('/', function(req, res, next){
+	console.log("Login check complete");
+	
     res.send("reached /user");
 });
-
-
-//these are littered everywhere now ;)
-var focus = function(onWhat){
-    return function(garbage){
-        return onWhat;
-    }
-}
 
 var extractFirst = function(fromWhat){
     return fromWhat[0];
 }
 
 var genericError = function(err){
-    log.it("there was an error : ", err);
+    console.log("there was an error : ", err);
     return null;
 }
 
@@ -33,7 +27,7 @@ var holdIt = function(name, items){
 
 router.get('/getUserEmail', function(req, res, next){
     data = req.tokenData;
-    log.it("requesting email", data);
+    console.log("requesting email", data);
     database.getUserEmail(data).then(function(email){
         res.send(email);
     })
@@ -42,53 +36,45 @@ router.get('/getUserEmail', function(req, res, next){
 router.get('/getUserInfo', function(req, res, next){
     data = req.tokenData;
     var returnUserInfo = function(result){
-            log.it("userinfo request result: ", result);
+            console.log("userinfo request result: ", result);
             res.status(200).send(result);//result);
     }
-    log.it("requesting userinfo", data);
-    database.getUserInfo(data).then(
-        returnUserInfo,
-        function(err){
-            log.it("there was an error : ", err);
-            log.it("attemping blanking of user table to resolve...");
-            database.blankUserTable(data)
-                .then(getUserInfo)
-                .then(returnUserInfo,
-                function(err){
-                    log.it("ERR! but the problem wasn't resolved!");
-                    res.status(500).send("There was a problem retrieving the users info");
-                }
-            )
-        }
-    )
+    console.log("requesting userinfo", data);
+    database.getUserInfo(data)
+	.then(
+        returnUserInfo
+	)
+	.catch(function(err){
+		console.log("ERR! but the problem wasn't resolved!");
+		res.status(500).send("There was a problem retrieving the users info");
+    })
 });
 
 router.post('/updateUserInfo', function(req, res, next) {
-    //log.it(req.body.data);
+    //console.log(req.body.data);
     data = req.body.data;
     data.userid = req.tokenData.userid;
-    log.it("updating userinfo", data);
+    console.log("updating userinfo", data);
     database.updateUserInfo(data).then(function(result){
-        log.it("userinfo update result: ", result);
+        console.log("userinfo update result: ", result);
         res.status(200).send("updated");//result);
-    },function(err){
-        log.it("there was an error : ", err);
+    })
+	.catch(function(err){
+        console.log("there was an error : ", err);
         res.status(500).send("error updating");
     })
 });
 
-var focus = function(onWhat){
-	return function(garbage){
-		return onWhat;
-	}
-}
 
-//about time!
 router.post('/logout', function(req, res, next) {
-	database.logoutUser({userid : req.tokenData.userid})
+	database.logoutUser({userID : req.tokenData.userID})
 		.then(function(result){
 			console.log("logged out! ", result);
 			res.status(200).send("logged out");
+		})
+		.catch(function(err){
+			console.log("there was an error : ", err);
+			res.status(500).send("Error logging out");
 		})
 });
 
@@ -98,6 +84,10 @@ router.post('/subscribe', function(req, res, next) {
 		.then(function(result){
 			console.log("subscribed! ", result);
 			res.status(200).send("logged out");
+		})
+		.catch(function(err){
+			console.log("Failed to subscribe : ", err);
+			res.status(500).send("error subscribing");
 		})
 });
 
